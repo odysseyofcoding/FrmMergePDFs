@@ -2,6 +2,7 @@
 using PdfSharp.Pdf.IO;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -9,20 +10,17 @@ namespace FrmMergePDFs
 {
     public partial class FrmMergePDFs : Form
     {
-        private List<string> pathsToFiles;
-        private List<string> fileNames;
-        private BindingSource bsFileNames;
+        private List<FileInfo> pathsToFiles;
+        private BindingSource bsPathsToFiles;
         public FrmMergePDFs()
         {
             InitializeComponent();
         }
         private void FrmMergePDFs_Load(object sender, EventArgs e)
         {
-            bsFileNames = new BindingSource();
-            pathsToFiles = new List<string>();
-            fileNames = new List<string>();
-            bsFileNames.DataSource = fileNames;
-            lbxPaths.DataSource = bsFileNames;
+            pathsToFiles = new List<FileInfo>();
+            bsPathsToFiles = new BindingSource { DataSource = pathsToFiles };
+            lbxPaths.DataSource = bsPathsToFiles;
         }
         private void BtnAddPDF_Click(object sender, EventArgs e)
         {
@@ -33,10 +31,8 @@ namespace FrmMergePDFs
                 ofdAddPDFs.Multiselect = true;
                 if (ofdAddPDFs.ShowDialog() == DialogResult.OK)
                 {
-                    ofdAddPDFs.FileNames.ToList().ForEach(filePath => pathsToFiles.Add(filePath));
-                    ofdAddPDFs.SafeFileNames.ToList().ForEach(fileName => fileNames.Add(fileName));
-
-                    bsFileNames.ResetBindings(false);
+                    ofdAddPDFs.FileNames.ToList().ForEach(fileName => pathsToFiles.Add(new FileInfo(fileName)));
+                    bsPathsToFiles.ResetBindings(false);
                 }
             }
         }
@@ -50,9 +46,9 @@ namespace FrmMergePDFs
         }
         private void BtnMergePDFs_Click(object sender, EventArgs e)
         {
-            if (fileNames.Count == 0)
+            if (pathsToFiles.Count == 0)
             {
-                MessageBox.Show("No files to merge, please select at least one file");
+                MessageBox.Show("No files to merge, please select at least one file!", "Error!");
                 return;
             }
             using (SaveFileDialog sfdSavePDF = new SaveFileDialog())
@@ -62,15 +58,16 @@ namespace FrmMergePDFs
                 if (sfdSavePDF.ShowDialog() == DialogResult.OK)
                 {
                     PdfDocument outpdf = new PdfDocument();
-                    pathsToFiles.ForEach(path => CopyPages(PdfReader.Open(path, PdfDocumentOpenMode.Import), outpdf));
+
+                    pathsToFiles.ForEach(path => CopyPages(PdfReader.Open(path.FullName, PdfDocumentOpenMode.Import), outpdf));
 
                     outpdf.Save(sfdSavePDF.FileName);
 
-                    pathsToFiles.Clear();
-                    fileNames.Clear();
+                    if (QuestionAction("Successfully merged!\n\nDo You want to keep the selection?", "Result") == DialogResult.Yes) return;
 
-                    bsFileNames.ResetBindings(false);
-                    MessageBox.Show("Successfully merged");
+                    pathsToFiles.Clear();
+
+                    bsPathsToFiles.ResetBindings(false);
                 }
             }
         }
@@ -80,16 +77,12 @@ namespace FrmMergePDFs
             int newIndex = lbxPaths.SelectedIndex + direction;
             if (newIndex < 0 || newIndex >= lbxPaths.Items.Count) return;
 
-            string selectedItem = lbxPaths.SelectedItem.ToString();
-            fileNames.Remove(selectedItem);
-            fileNames.Insert(newIndex, selectedItem);
-
-            string temporary = pathsToFiles[lbxPaths.SelectedIndex];
+            FileInfo temporary = pathsToFiles[lbxPaths.SelectedIndex];
             pathsToFiles.RemoveAt(lbxPaths.SelectedIndex);
             pathsToFiles.Insert(newIndex, temporary);
 
             lbxPaths.SetSelected(newIndex, true);
-            bsFileNames.ResetBindings(false);
+            bsPathsToFiles.ResetBindings(false);
         }
         private void CopyPages(PdfDocument sourcePDF, PdfDocument toNewPDF)
         {
@@ -101,18 +94,16 @@ namespace FrmMergePDFs
         private void BtnRemove_Click(object sender, EventArgs e)
         {
             if (lbxPaths.Items.Count == 0) return;
-            if (QuestionAction($"Do You really want to delete {lbxPaths.SelectedItem}", "Delete") == DialogResult.No) return;
-            fileNames.Remove(lbxPaths.SelectedItem.ToString());
+            if (QuestionAction($"Do You really want to delete {Path.GetFileName(lbxPaths.SelectedItem.ToString())} ?", "Delete") == DialogResult.No) return;
             pathsToFiles.RemoveAt(lbxPaths.SelectedIndex);
-            bsFileNames.ResetBindings(false);
+            bsPathsToFiles.ResetBindings(false);
         }
         private void BtnRemoveAll_Click(object sender, EventArgs e)
         {
             if (lbxPaths.Items.Count == 0) return;
-            if (QuestionAction("Do You really want to delete all", "Delete") == DialogResult.No) return;
-            fileNames.Clear();
+            if (QuestionAction("Do You really want to delete all?", "Delete") == DialogResult.No) return;
             pathsToFiles.Clear();
-            bsFileNames.ResetBindings(false);
+            bsPathsToFiles.ResetBindings(false);
         }
         private void FrmMergePDFs_FormClosing(object sender, FormClosingEventArgs e)
         {
@@ -121,8 +112,7 @@ namespace FrmMergePDFs
         }
         private DialogResult QuestionAction(string question, string caption)
         {
-            DialogResult result = MessageBox.Show(question, caption, MessageBoxButtons.YesNo);
-            return result;
+            return MessageBox.Show(question, caption, MessageBoxButtons.YesNo);
         }
     }
 }

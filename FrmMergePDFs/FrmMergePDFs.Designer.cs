@@ -42,6 +42,7 @@
             this.lbxPaths.FormattingEnabled = true;
             this.lbxPaths.Location = new System.Drawing.Point(12, 12);
             this.lbxPaths.Name = "lbxPaths";
+            this.lbxPaths.DisplayMember = "Name";
             this.lbxPaths.Size = new System.Drawing.Size(203, 420);
             this.lbxPaths.TabIndex = 0;
             this.lbxPaths.TabStop = false;
